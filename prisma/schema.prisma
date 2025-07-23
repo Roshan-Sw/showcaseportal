@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STANDARD_USER
+  HR_ASSISTANT
+  HR_HEAD
+  NO_ACCESS
+}
+
+model User {
+  id         Int       @id
+  first_name String?
+  last_name  String?
+  email      String?   @unique
+  phone      String?
+  role       UserRole? @default(STANDARD_USER)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  created_by Int?
+  updated_by Int?
+
+  createdBy User? @relation("UserCreatedBy", fields: [created_by], references: [id])
+  updatedBy User? @relation("UserUpdatedBy", fields: [updated_by], references: [id])
+
+  usersCreated User[] @relation("UserCreatedBy")
+  usersUpdated User[] @relation("UserUpdatedBy")
+}
