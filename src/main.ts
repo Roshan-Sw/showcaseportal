@@ -5,6 +5,9 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { SuccessInterceptor } from './common/interceptors/success.interceptor';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);

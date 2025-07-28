@@ -32,4 +32,197 @@ model User {
 
   usersCreated User[] @relation("UserCreatedBy")
   usersUpdated User[] @relation("UserUpdatedBy")
+
+  websitesCreated Website[] @relation("WebsiteCreatedBy")
+  websitesUpdated Website[] @relation("WebsiteUpdatedBy")
+
+  technologiesCreated Technology[] @relation("TechnologyCreatedBy")
+  technologiesUpdated Technology[] @relation("TechnologyUpdatedBy")
+
+  websiteTechMapsCreated Website_Technology_Mapping[] @relation("WebsiteTechMapCreatedBy")
+  websiteTechMapsUpdated Website_Technology_Mapping[] @relation("WebsiteTechMapUpdatedBy")
+
+  tagMappingsCreated Tag_Mapping[] @relation("TagMappingCreatedBy")
+  tagMappingsUpdated Tag_Mapping[] @relation("TagMappingUpdatedBy")
+
+  videosCreated Video[] @relation("VideoCreatedBy")
+  videosUpdated Video[] @relation("VideoUpdatedBy")
+}
+
+model Client {
+  id           Int       @id
+  client_name  String?
+  country_id   Int?
+  description  String?
+  description1 String?
+  thumbnail    String?
+  priority     Int       @default(0)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  Project      Project[]
+  Website      Website[]
+  videos       Video[]
+}
+
+model Project {
+  id           BigInt          @id
+  client_id    Int?
+  project_name String
+  description  String?
+  description1 String?
+  priority     Int             @default(0)
+  start_date   DateTime?
+  created_at   DateTime        @default(now())
+  updated_at   DateTime        @updatedAt
+  client       Client?         @relation(fields: [client_id], references: [id])
+  scopes       ProjectScopes[]
+
+  @@map("projects")
+}
+
+model ProjectScopes {
+  id         BigInt    @id @default(autoincrement())
+  projectId  BigInt
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scopeType  ScopeType
+  isSelected Boolean   @default(false)
+
+  @@map("project_scopes")
+}
+
+enum ScopeType {
+  WEBSITE_DEVELOPMENT
+  LANDING_PAGE
+  SEO
+  SOCIAL_MEDIA_MARKETING
+  META_ADS
+  GOOGLE_ADS
+  BRANDING
+  LOGO_DESIGN
+  BROCHURE_DESIGN
+  DOMAIN_MANAGEMENT
+  REEL_PRODUCTION
+  CORPORATE_VIDEO
+  AD_FILM
+  INFLUENCER_MARKETING
+}
+
+model Website {
+  id          Int         @id @default(autoincrement())
+  client_id   Int
+  title       String
+  url         String
+  type        WebsiteType
+  description String?
+  thumbnail   String?
+  launch_date DateTime?
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @updatedAt
+
+  created_by Int?
+  updated_by Int?
+
+  createdBy User? @relation("WebsiteCreatedBy", fields: [created_by], references: [id])
+  updatedBy User? @relation("WebsiteUpdatedBy", fields: [updated_by], references: [id])
+
+  client       Client                       @relation(fields: [client_id], references: [id])
+  technologies Website_Technology_Mapping[]
+  tags         Tag_Mapping[]                @relation("WebsiteTagMapping")
+}
+
+model Technology {
+  id         Int      @id @default(autoincrement())
+  name       String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  created_by Int?
+  updated_by Int?
+
+  createdBy User? @relation("TechnologyCreatedBy", fields: [created_by], references: [id])
+  updatedBy User? @relation("TechnologyUpdatedBy", fields: [updated_by], references: [id])
+
+  websites Website_Technology_Mapping[]
+}
+
+model Website_Technology_Mapping {
+  id            Int        @id @default(autoincrement())
+  website_id    Int
+  technology_id Int
+  website       Website    @relation(fields: [website_id], references: [id])
+  technology    Technology @relation(fields: [technology_id], references: [id])
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+
+  created_by Int?
+  updated_by Int?
+
+  createdBy User? @relation("WebsiteTechMapCreatedBy", fields: [created_by], references: [id])
+  updatedBy User? @relation("WebsiteTechMapUpdatedBy", fields: [updated_by], references: [id])
+}
+
+model Tag_Mapping {
+  id          Int        @id @default(autoincrement())
+  entity_type EntityType
+  entity_id   Int
+  tag_name    String
+
+  website Website? @relation("WebsiteTagMapping", fields: [entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tagmapping_website")
+  video   Video?   @relation("VideoTagMapping", fields: [entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tagmapping_video")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  created_by Int?
+  updated_by Int?
+
+  createdBy User? @relation("TagMappingCreatedBy", fields: [created_by], references: [id])
+  updatedBy User? @relation("TagMappingUpdatedBy", fields: [updated_by], references: [id])
+}
+
+enum WebsiteType {
+  WEBSITE
+  LANDING_PAGE
+}
+
+enum EntityType {
+  WEBSITE
+  VIDEO
+  CREATIVE
+}
+
+model Video {
+  id          Int         @id @default(autoincrement())
+  client_id   Int
+  title       String
+  description String?
+  video_url   String
+  thumbnail   String?
+  format      VideoFormat
+  type        VideoType
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @updatedAt
+
+  created_by Int?
+  updated_by Int?
+
+  createdBy User?         @relation("VideoCreatedBy", fields: [created_by], references: [id])
+  updatedBy User?         @relation("VideoUpdatedBy", fields: [updated_by], references: [id])
+  client    Client        @relation(fields: [client_id], references: [id])
+  tags      Tag_Mapping[] @relation("VideoTagMapping")
+}
+
+enum VideoFormat {
+  LANDSCAPE
+  PORTRAIT
+  SQUARE
+}
+
+enum VideoType {
+  CORPORATE_VIDEO
+  AD_FILM
+  REEL
+  ANIMATION
+  INTERVIEW
+  PORTRAIT
 }

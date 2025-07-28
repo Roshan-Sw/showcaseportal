@@ -12,26 +12,14 @@ import {
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
-import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserRoleDto } from './dto/update-role-user.dto';
+import { ClientsService } from './clients.service';
+import { CreateClientDto } from './dto/create-client.dto';
+import { UpdateClientPriorityDto } from './dto/update-client-priority.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 
-@Controller('users')
-export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
-
-  @Post('create')
-  @UsePipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  )
-  async create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
-  }
+@Controller('clients')
+export class ClientsController {
+  constructor(private readonly clientsService: ClientsService) {}
 
   @Get('list')
   @UseGuards(JwtAuthGuard)
@@ -39,7 +27,7 @@ export class UsersController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
     @Query('keyword') keyword: string = '',
-    @Query('role') role?: string,
+    @Query('country_id') country_id?: string,
   ) {
     const parsedPage = parseInt(page, 10);
     if (isNaN(parsedPage) || parsedPage < 1) {
@@ -55,15 +43,15 @@ export class UsersController {
       );
     }
 
-    return this.usersService.getAllUsers(
+    return this.clientsService.getAllClients(
       parsedPage,
       parsedLimit,
       keyword,
-      role,
+      country_id,
     );
   }
 
-  @Put('update-role/:id')
+  @Put('update/:id')
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -71,23 +59,18 @@ export class UsersController {
       transform: true,
     }),
   )
-  async updateRole(
+  async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateUserRoleDto,
+    @Body() dto: UpdateClientPriorityDto,
   ) {
-    return this.usersService.updateUserRole(id, dto);
-  }
-
-  @Get('view/:id')
-  async view(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.getUserById(id);
+    return this.clientsService.update(id, dto);
   }
 
   @Post('syncing')
-  async syncUsers(@Body() body: { users: CreateUserDto[] }) {
-    if (!body.users || !Array.isArray(body.users)) {
-      throw new BadRequestException('Invalid users data');
+  async syncClients(@Body() body: { clients: CreateClientDto[] }) {
+    if (!body.clients || !Array.isArray(body.clients)) {
+      throw new BadRequestException('Invalid clients data');
     }
-    return this.usersService.syncUsers(body.users);
+    return this.clientsService.syncClients(body.clients);
   }
 }

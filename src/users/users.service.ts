@@ -18,9 +18,6 @@ export class UsersService {
         where: {
           OR: [{ id: dto.id }, dto.email ? { email: dto.email } : {}],
         },
-        include: {
-          employee: true,
-        },
       });
 
       if (existingUser) {
@@ -47,9 +44,6 @@ export class UsersService {
 
       const user = await this.prisma.user.create({
         data,
-        include: {
-          employee: true,
-        },
       });
 
       return {
@@ -91,9 +85,6 @@ export class UsersService {
           skip,
           take: limit,
           orderBy: { id: 'desc' },
-          include: {
-            employee: true,
-          },
         }),
         this.prisma.user.count({ where }),
       ]);
@@ -127,9 +118,6 @@ export class UsersService {
             ? { connect: { id: dto.updated_by } }
             : undefined,
         },
-        include: {
-          employee: true,
-        },
       });
 
       return {
@@ -147,9 +135,6 @@ export class UsersService {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id },
-        include: {
-          employee: true,
-        },
       });
 
       if (!user) {
@@ -187,9 +172,6 @@ export class UsersService {
 
           await this.prisma.user.create({
             data,
-            include: {
-              employee: true,
-            },
           });
           createdCount++;
         } else {
