@@ -88,6 +88,42 @@ export class VideosController {
     return this.service.list(page, limit, keyword);
   }
 
+  @Get('listing')
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async listing(
+    @Query('page', new ParseIntPipe({ errorHttpStatusCode: 400 }))
+    page: number = 1,
+    @Query('limit', new ParseIntPipe({ errorHttpStatusCode: 400 }))
+    limit: number = 10,
+    @Query('keyword') keyword: string = '',
+    @Query('client_id') client_id?: number,
+    @Query('type')
+    type?:
+      | 'CORPORATE_VIDEO'
+      | 'AD_FILM'
+      | 'REEL'
+      | 'ANIMATION'
+      | 'INTERVIEW'
+      | 'PORTRAIT',
+    @Query('format')
+    format?: 'LANDSCAPE' | 'PORTRAIT' | 'SQUARE',
+  ) {
+    return this.service.listWithFilters(
+      page,
+      limit,
+      keyword,
+      client_id,
+      type,
+      format,
+    );
+  }
+
   @Put(':id')
   @UseInterceptors(
     FileInterceptor('thumbnail', {
