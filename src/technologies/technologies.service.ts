@@ -77,6 +77,33 @@ export class TechnologiesService {
     return { technologies, total, page, limit };
   }
 
+  async listing(page: number, limit: number, keyword: string) {
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.TechnologyWhereInput = {
+      ...(keyword && { name: { contains: keyword, mode: 'insensitive' } }),
+    };
+
+    const [technologies, total] = await Promise.all([
+      this.prisma.technology.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { id: 'desc' },
+        include: {
+          websites: {
+            include: {
+              website: { select: { id: true, title: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.technology.count({ where }),
+    ]);
+
+    return { technologies, total, page, limit };
+  }
+
   async update(id: number, dto: UpdateTechnologyDto) {
     const existing = await this.prisma.technology.findUnique({
       where: { id },

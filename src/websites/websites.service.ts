@@ -71,6 +71,54 @@ export class WebsitesService {
     return { websites, total, page, limit };
   }
 
+  async listWithFilters(
+    page: number,
+    limit: number,
+    keyword: string,
+    client_id?: number,
+    technology_id?: number,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.WebsiteWhereInput = {
+      ...(keyword && {
+        tags: {
+          some: {
+            tag_name: { contains: keyword, mode: 'insensitive' },
+            entity_type: 'WEBSITE',
+          },
+        },
+      }),
+      ...(client_id && { client_id }),
+      ...(technology_id && {
+        technologies: {
+          some: {
+            technology_id,
+          },
+        },
+      }),
+    };
+
+    const [websites, total] = await Promise.all([
+      this.prisma.website.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { id: 'desc' },
+        include: {
+          client: { select: { id: true, client_name: true } },
+          technologies: {
+            include: { technology: { select: { id: true, name: true } } },
+          },
+          tags: { select: { id: true, tag_name: true, entity_type: true } },
+        },
+      }),
+      this.prisma.website.count({ where }),
+    ]);
+
+    return { websites, total, page, limit };
+  }
+
   async update(id: number, dto: UpdateWebsiteDto) {
     const existing = await this.prisma.website.findUnique({
       where: { id },

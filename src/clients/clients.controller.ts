@@ -51,6 +51,42 @@ export class ClientsController {
     );
   }
 
+  @Get('listing')
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async listing(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('keyword') keyword: string = '',
+    @Query('country_id') country_id?: string,
+  ) {
+    const parsedPage = parseInt(page, 10);
+    if (isNaN(parsedPage) || parsedPage < 1) {
+      throw new BadRequestException(
+        'Query parameter "page" must be a positive integer',
+      );
+    }
+
+    const parsedLimit = parseInt(limit, 10);
+    if (isNaN(parsedLimit) || parsedLimit < 1) {
+      throw new BadRequestException(
+        'Query parameter "limit" must be a positive integer',
+      );
+    }
+
+    return this.clientsService.getAllClients(
+      parsedPage,
+      parsedLimit,
+      keyword,
+      country_id,
+    );
+  }
+
   @Put('update/:id')
   @UsePipes(
     new ValidationPipe({

@@ -8,14 +8,19 @@ import {
 import { Type } from 'class-transformer';
 
 export class CreateTagMappingDto {
-  @IsEnum(['WEBSITE', 'VIDEO', 'CREATIVE'])
+  @IsEnum(['WEBSITE', 'VIDEO'])
   @IsNotEmpty()
-  entity_type: 'WEBSITE' | 'VIDEO' | 'CREATIVE';
+  entity_type: 'WEBSITE' | 'VIDEO';
 
   @IsInt()
-  @IsNotEmpty()
+  @IsOptional()
   @Type(() => Number)
-  entity_id: number;
+  website_id?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  video_id?: number;
 
   @IsString()
   @IsNotEmpty()

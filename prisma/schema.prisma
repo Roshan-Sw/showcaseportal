@@ -164,11 +164,13 @@ model Website_Technology_Mapping {
 model Tag_Mapping {
   id          Int        @id @default(autoincrement())
   entity_type EntityType
-  entity_id   Int
   tag_name    String
 
-  website Website? @relation("WebsiteTagMapping", fields: [entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tagmapping_website")
-  video   Video?   @relation("VideoTagMapping", fields: [entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tagmapping_video")
+  website_id Int?
+  video_id   Int?
+
+  website Website? @relation("WebsiteTagMapping", fields: [website_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tagmapping_website")
+  video   Video?   @relation("VideoTagMapping", fields: [video_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tagmapping_video")
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt

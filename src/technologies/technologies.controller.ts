@@ -10,6 +10,7 @@ import {
   UsePipes,
   ValidationPipe,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { TechnologiesService } from './technologies.service';
 import { CreateTechnologyDto } from './dto/create-technology.dto';
@@ -33,6 +34,24 @@ export class TechnologiesController {
 
   @Get()
   async list(
+    @Query('page', new ParseIntPipe({ errorHttpStatusCode: 400 }))
+    page: number = 1,
+    @Query('limit', new ParseIntPipe({ errorHttpStatusCode: 400 }))
+    limit: number = 10,
+    @Query('keyword') keyword: string = '',
+  ) {
+    return this.service.list(page, limit, keyword);
+  }
+
+  @Get('listing')
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async listing(
     @Query('page', new ParseIntPipe({ errorHttpStatusCode: 400 }))
     page: number = 1,
     @Query('limit', new ParseIntPipe({ errorHttpStatusCode: 400 }))

@@ -57,6 +57,102 @@ export class ClientsService {
     }
   }
 
+  async listing(
+    page: number,
+    limit: number,
+    keyword: string,
+    country_id?: string,
+  ) {
+    try {
+      const skip = (page - 1) * limit;
+
+      const where: Prisma.ClientWhereInput = {
+        AND: [
+          keyword
+            ? {
+                OR: [
+                  { client_name: { contains: keyword, mode: 'insensitive' } },
+                  { description: { contains: keyword, mode: 'insensitive' } },
+                  { description1: { contains: keyword, mode: 'insensitive' } },
+                ],
+              }
+            : {},
+          country_id ? { country_id: parseInt(country_id, 10) } : {},
+        ],
+      };
+
+      const [clients, total] = await Promise.all([
+        this.prisma.client.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { priority: 'desc' },
+          include: {
+            Project: {
+              select: {
+                id: true,
+                project_name: true,
+                priority: true,
+                start_date: true,
+                created_at: true,
+                updated_at: true,
+                scopes: {
+                  select: {
+                    id: true,
+                    scopeType: true,
+                    isSelected: true,
+                  },
+                },
+              },
+            },
+            Website: {
+              select: {
+                id: true,
+                title: true,
+                url: true,
+                type: true,
+                description: true,
+                thumbnail: true,
+                launch_date: true,
+                created_at: true,
+                updated_at: true,
+                technologies: {
+                  select: {
+                    technology: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+                tags: {
+                  select: {
+                    id: true,
+                    tag_name: true,
+                    entity_type: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+        this.prisma.client.count({ where }),
+      ]);
+
+      return {
+        clients,
+        total,
+        page,
+        limit,
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        error.message || 'Failed to fetch clients listing',
+      );
+    }
+  }
+
   async update(id: number, dto: UpdateClientPriorityDto) {
     try {
       const client = await this.prisma.client.findUnique({

@@ -13,10 +13,29 @@ export class TagMappingsService {
 
   async create(dto: CreateTagMappingDto) {
     try {
+      if (dto.website_id && dto.video_id) {
+        throw new BadRequestException(
+          'Only one of website_id or video_id should be provided',
+        );
+      }
+
+      if (dto.entity_type === 'WEBSITE' && !dto.website_id) {
+        throw new BadRequestException(
+          'website_id is required for WEBSITE entity type',
+        );
+      }
+
+      if (dto.entity_type === 'VIDEO' && !dto.video_id) {
+        throw new BadRequestException(
+          'video_id is required for VIDEO entity type',
+        );
+      }
+
       const existingTag = await this.prisma.tag_Mapping.findFirst({
         where: {
           entity_type: dto.entity_type,
-          entity_id: dto.entity_id,
+          website_id: dto.website_id,
+          video_id: dto.video_id,
           tag_name: dto.tag_name,
         },
       });
@@ -30,14 +49,10 @@ export class TagMappingsService {
       const data: Prisma.Tag_MappingCreateInput = {
         entity_type: dto.entity_type,
         tag_name: dto.tag_name,
-        website:
-          dto.entity_type === 'WEBSITE'
-            ? { connect: { id: dto.entity_id } }
-            : undefined,
-        video:
-          dto.entity_type === 'VIDEO'
-            ? { connect: { id: dto.entity_id } }
-            : undefined,
+        website: dto.website_id
+          ? { connect: { id: dto.website_id } }
+          : undefined,
+        video: dto.video_id ? { connect: { id: dto.video_id } } : undefined,
         createdBy: dto.created_by
           ? { connect: { id: dto.created_by } }
           : undefined,
@@ -63,7 +78,7 @@ export class TagMappingsService {
       const tags = await this.prisma.tag_Mapping.findMany({
         where: {
           entity_type: 'WEBSITE',
-          entity_id: websiteId,
+          website_id: websiteId,
         },
         orderBy: { id: 'desc' },
       });
@@ -81,7 +96,7 @@ export class TagMappingsService {
       const tags = await this.prisma.tag_Mapping.findMany({
         where: {
           entity_type: 'VIDEO',
-          entity_id: videoId,
+          video_id: videoId,
         },
         orderBy: { id: 'desc' },
       });
@@ -95,19 +110,29 @@ export class TagMappingsService {
   }
 
   async delete(id: number) {
-    const tag_Mapping = await this.prisma.tag_Mapping.findUnique({
-      where: { id },
-    });
-    if (!tag_Mapping) {
-      throw new NotFoundException(`Tag mapping with ID ${id} not found`);
-    }
+    try {
+      const tag_Mapping = await this.prisma.tag_Mapping.findUnique({
+        where: { id },
+      });
 
-    const deleted = await this.prisma.tag_Mapping.delete({
-      where: { id },
-    });
-    return {
-      message: `Tag mapping with ID ${id} deleted successfully`,
-      tagMapping: deleted,
-    };
+      if (!tag_Mapping) {
+        throw new NotFoundException(`Tag mapping with ID ${id} not found`);
+      }
+
+      const deleted = await this.prisma.tag_Mapping.delete({
+        where: { id },
+      });
+
+      return {
+        message: `Tag mapping with ID ${id} deleted successfully`,
+        tagMapping: deleted,
+      };
+    } catch (error) {
+      throw error instanceof NotFoundException
+        ? error
+        : new BadRequestException(
+            error.message || 'Failed to delete tag mapping',
+          );
+    }
   }
 }
