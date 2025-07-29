@@ -105,6 +105,7 @@ export class WebsitesController {
     @Query('keyword') keyword: string = '',
     @Query('client_id') client_id?: number,
     @Query('technology_id') technology_id?: number,
+    @Query('type') type?: 'WEBSITE' | 'LANDING_PAGE',
   ) {
     return this.service.listWithFilters(
       page,
@@ -112,6 +113,7 @@ export class WebsitesController {
       keyword,
       client_id,
       technology_id,
+      type,
     );
   }
 

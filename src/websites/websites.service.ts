@@ -77,6 +77,7 @@ export class WebsitesService {
     keyword: string,
     client_id?: number,
     technology_id?: number,
+    type?: 'WEBSITE' | 'LANDING_PAGE',
   ) {
     const skip = (page - 1) * limit;
 
@@ -97,6 +98,7 @@ export class WebsitesService {
           },
         },
       }),
+      ...(type && { type }),
     };
 
     const [websites, total] = await Promise.all([
