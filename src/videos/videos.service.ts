@@ -7,11 +7,64 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
 import { Prisma } from '@prisma/client';
-import { unlink } from 'fs/promises';
+import {
+  S3Client,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+function validateEnv() {
+  const requiredEnvVars = [
+    'AWS_REGION',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'AWS_S3_BUCKET_NAME',
+  ];
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      throw new Error(`Missing required environment variable: ${envVar}`);
+    }
+  }
+  return {
+    region: process.env.AWS_REGION as string,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
+    bucket: process.env.AWS_S3_BUCKET_NAME as string,
+  };
+}
 
 @Injectable()
 export class VideosService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly s3Client: S3Client;
+  private readonly bucket: string;
+  private readonly region: string;
+
+  constructor(private readonly prisma: PrismaService) {
+    const { region, accessKeyId, secretAccessKey, bucket } = validateEnv();
+    this.bucket = bucket;
+    this.region = region;
+    this.s3Client = new S3Client({
+      region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    });
+  }
+
+  private async getPresignedUrlFromKey(key: string): Promise<string | null> {
+    if (!key) return null;
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      });
+      return await getSignedUrl(this.s3Client, command, { expiresIn: 3600 });
+    } catch (e) {
+      return null;
+    }
+  }
 
   async create(dto: CreateVideoDto) {
     try {
@@ -62,7 +115,24 @@ export class VideosService {
       this.prisma.video.count({ where }),
     ]);
 
-    return { videos, total, page, limit };
+    const videosWithPresigned = await Promise.all(
+      videos.map(async (video) => {
+        let thumbnail_presigned_url: string | null = null;
+        if (video.thumbnail) {
+          thumbnail_presigned_url = await this.getPresignedUrlFromKey(
+            video.thumbnail,
+          );
+        }
+
+        const { thumbnail, ...rest } = video;
+        return {
+          ...rest,
+          thumbnail_presigned_url,
+        };
+      }),
+    );
+
+    return { videos: videosWithPresigned, total, page, limit };
   }
 
   async listWithFilters(
@@ -113,7 +183,24 @@ export class VideosService {
       this.prisma.video.count({ where }),
     ]);
 
-    return { videos, total, page, limit };
+    const videosWithPresigned = await Promise.all(
+      videos.map(async (video) => {
+        let thumbnail_presigned_url: string | null = null;
+        if (video.thumbnail) {
+          thumbnail_presigned_url = await this.getPresignedUrlFromKey(
+            video.thumbnail,
+          );
+        }
+
+        const { thumbnail, ...rest } = video;
+        return {
+          ...rest,
+          thumbnail_presigned_url,
+        };
+      }),
+    );
+
+    return { videos: videosWithPresigned, total, page, limit };
   }
 
   async update(id: number, dto: UpdateVideoDto) {
@@ -131,10 +218,15 @@ export class VideosService {
         existing.thumbnail !== dto.thumbnail
       ) {
         try {
-          await unlink(existing.thumbnail);
+          const oldKey = existing.thumbnail;
+          const command = new DeleteObjectCommand({
+            Bucket: this.bucket,
+            Key: oldKey,
+          });
+          await this.s3Client.send(command);
         } catch (error) {
           console.warn(
-            `Failed to delete old file ${existing.thumbnail}: ${error.message}`,
+            `Failed to delete old S3 object ${existing.thumbnail}: ${error.message}`,
           );
         }
       }
@@ -182,11 +274,16 @@ export class VideosService {
 
     try {
       if (video.thumbnail) {
-        await unlink(video.thumbnail);
+        const key = video.thumbnail;
+        const command = new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        });
+        await this.s3Client.send(command);
       }
     } catch (error) {
       console.warn(
-        `Failed to delete file ${video.thumbnail}: ${error.message}`,
+        `Failed to delete S3 object ${video.thumbnail}: ${error.message}`,
       );
     }
 

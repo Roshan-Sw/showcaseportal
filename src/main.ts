@@ -4,7 +4,6 @@ import { ValidationPipe } from '@nestjs/common';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { SuccessInterceptor } from './common/interceptors/success.interceptor';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -28,10 +27,6 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new SuccessInterceptor());
-
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads/',
-  });
 
   await app.listen(process.env.PORT ?? 5000);
 }

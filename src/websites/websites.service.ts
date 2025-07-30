@@ -8,11 +8,64 @@ import { CreateWebsiteDto } from './dto/create-website.dto';
 import { UpdateWebsiteDto } from './dto/update-website.dto';
 import { UpdateWebsiteTechnologyMappingsDto } from './dto/update-website-technology-mapping.dto';
 import { Prisma } from '@prisma/client';
-import { unlink } from 'fs/promises';
+import {
+  S3Client,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+function validateEnv() {
+  const requiredEnvVars = [
+    'AWS_REGION',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'AWS_S3_BUCKET_NAME',
+  ];
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      throw new Error(`Missing required environment variable: ${envVar}`);
+    }
+  }
+  return {
+    region: process.env.AWS_REGION as string,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
+    bucket: process.env.AWS_S3_BUCKET_NAME as string,
+  };
+}
 
 @Injectable()
 export class WebsitesService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly s3Client: S3Client;
+  private readonly bucket: string;
+  private readonly region: string;
+
+  constructor(private readonly prisma: PrismaService) {
+    const { region, accessKeyId, secretAccessKey, bucket } = validateEnv();
+    this.bucket = bucket;
+    this.region = region;
+    this.s3Client = new S3Client({
+      region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    });
+  }
+
+  private async getPresignedUrlFromKey(key: string): Promise<string | null> {
+    if (!key) return null;
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      });
+      return await getSignedUrl(this.s3Client, command, { expiresIn: 3600 });
+    } catch (e) {
+      return null;
+    }
+  }
 
   async create(dto: CreateWebsiteDto) {
     try {
@@ -68,7 +121,24 @@ export class WebsitesService {
       this.prisma.website.count({ where }),
     ]);
 
-    return { websites, total, page, limit };
+    const websitesWithPresigned = await Promise.all(
+      websites.map(async (website) => {
+        let thumbnail_presigned_url: string | null = null;
+        if (website.thumbnail) {
+          thumbnail_presigned_url = await this.getPresignedUrlFromKey(
+            website.thumbnail,
+          );
+        }
+
+        const { thumbnail, ...rest } = website;
+        return {
+          ...rest,
+          thumbnail_presigned_url,
+        };
+      }),
+    );
+
+    return { websites: websitesWithPresigned, total, page, limit };
   }
 
   async listWithFilters(
@@ -118,7 +188,24 @@ export class WebsitesService {
       this.prisma.website.count({ where }),
     ]);
 
-    return { websites, total, page, limit };
+    const websitesWithPresigned = await Promise.all(
+      websites.map(async (website) => {
+        let thumbnail_presigned_url: string | null = null;
+        if (website.thumbnail) {
+          thumbnail_presigned_url = await this.getPresignedUrlFromKey(
+            website.thumbnail,
+          );
+        }
+
+        const { thumbnail, ...rest } = website;
+        return {
+          ...rest,
+          thumbnail_presigned_url,
+        };
+      }),
+    );
+
+    return { websites: websitesWithPresigned, total, page, limit };
   }
 
   async update(id: number, dto: UpdateWebsiteDto) {
@@ -136,10 +223,15 @@ export class WebsitesService {
         existing.thumbnail !== dto.thumbnail
       ) {
         try {
-          await unlink(existing.thumbnail);
+          const oldKey = existing.thumbnail;
+          const command = new DeleteObjectCommand({
+            Bucket: this.bucket,
+            Key: oldKey,
+          });
+          await this.s3Client.send(command);
         } catch (error) {
           console.warn(
-            `Failed to delete old file ${existing.thumbnail}: ${error.message}`,
+            `Failed to delete old S3 object ${existing.thumbnail}: ${error.message}`,
           );
         }
       }
@@ -189,11 +281,16 @@ export class WebsitesService {
 
     try {
       if (website.thumbnail) {
-        await unlink(website.thumbnail);
+        const key = website.thumbnail;
+        const command = new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        });
+        await this.s3Client.send(command);
       }
     } catch (error) {
       console.warn(
-        `Failed to delete file ${website.thumbnail}: ${error.message}`,
+        `Failed to delete S3 object ${website.thumbnail}: ${error.message}`,
       );
     }
 

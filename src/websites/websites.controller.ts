@@ -15,16 +15,51 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import * as multerS3 from 'multer-s3';
+import { S3Client } from '@aws-sdk/client-s3';
 import { WebsitesService } from './websites.service';
 import { CreateWebsiteDto } from './dto/create-website.dto';
 import { UpdateWebsiteDto } from './dto/update-website.dto';
 import { UpdateWebsiteTechnologyMappingsDto } from './dto/update-website-technology-mapping.dto';
 
+interface S3File extends Express.Multer.File {
+  key: string;
+}
+
+function validateEnv() {
+  const requiredEnvVars = [
+    'AWS_REGION',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'AWS_S3_BUCKET_NAME',
+  ];
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      throw new Error(`Missing required environment variable: ${envVar}`);
+    }
+  }
+  return {
+    region: process.env.AWS_REGION as string,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
+    bucket: process.env.AWS_S3_BUCKET_NAME as string,
+  };
+}
+
+const { region, accessKeyId, secretAccessKey, bucket } = validateEnv();
+
+const s3Client = new S3Client({
+  region,
+  credentials: {
+    accessKeyId,
+    secretAccessKey,
+  },
+});
+
 function fileName(req, file, cb) {
   const uniqueSuffix =
     Date.now() + '_' + file.originalname.replace(/\s+/g, '_');
-  cb(null, uniqueSuffix);
+  cb(null, `websites/thumbnails/${uniqueSuffix}`);
 }
 
 @Controller('websites')
@@ -34,9 +69,13 @@ export class WebsitesController {
   @Post()
   @UseInterceptors(
     FileInterceptor('thumbnail', {
-      storage: diskStorage({
-        destination: './uploads/websites/thumbnails',
-        filename: fileName,
+      storage: multerS3({
+        s3: s3Client,
+        bucket,
+        metadata: (req, file, cb) => {
+          cb(null, { fieldName: file.fieldname });
+        },
+        key: fileName,
       }),
       fileFilter: (req, file, cb) => {
         const allowedTypes = [
@@ -65,12 +104,9 @@ export class WebsitesController {
       transform: true,
     }),
   )
-  async create(
-    @Body() dto: CreateWebsiteDto,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
+  async create(@Body() dto: CreateWebsiteDto, @UploadedFile() file: S3File) {
     if (file) {
-      dto.thumbnail = file.path.replace(/\\/g, '/');
+      dto.thumbnail = file.key;
     }
     if (!dto.client_id) {
       throw new BadRequestException('Client ID is required');
@@ -120,9 +156,13 @@ export class WebsitesController {
   @Put(':id')
   @UseInterceptors(
     FileInterceptor('thumbnail', {
-      storage: diskStorage({
-        destination: './uploads/websites/thumbnails',
-        filename: fileName,
+      storage: multerS3({
+        s3: s3Client,
+        bucket,
+        metadata: (req, file, cb) => {
+          cb(null, { fieldName: file.fieldname });
+        },
+        key: fileName,
       }),
       fileFilter: (req, file, cb) => {
         const allowedTypes = [
@@ -154,10 +194,10 @@ export class WebsitesController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateWebsiteDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: S3File,
   ) {
     if (file) {
-      dto.thumbnail = file.path.replace(/\\/g, '/');
+      dto.thumbnail = file.key;
     }
     return this.service.update(id, dto);
   }
