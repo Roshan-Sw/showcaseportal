@@ -47,6 +47,9 @@ model User {
 
   videosCreated Video[] @relation("VideoCreatedBy")
   videosUpdated Video[] @relation("VideoUpdatedBy")
+
+  creativesCreated Creative[] @relation("CreativeCreatedBy")
+  creativesUpdated Creative[] @relation("CreativeUpdatedBy")
 }
 
 model Client {
@@ -227,4 +230,27 @@ enum VideoType {
   ANIMATION
   INTERVIEW
   PORTRAIT
+}
+
+model Creative {
+  id          Int          @id @default(autoincrement())
+  name        String
+  description String?
+  priority    Int          @default(0)
+  type        CreativeType
+  file        String?
+  thumbnail   String?
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+
+  created_by Int?
+  updated_by Int?
+
+  createdBy User? @relation("CreativeCreatedBy", fields: [created_by], references: [id])
+  updatedBy User? @relation("CreativeUpdatedBy", fields: [updated_by], references: [id])
+}
+
+enum CreativeType {
+  LOGO
+  BROCHURE
 }

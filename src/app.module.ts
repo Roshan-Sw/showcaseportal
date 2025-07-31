@@ -10,6 +10,7 @@ import { WebsitesModule } from './websites/websites.module';
 import { TechnologiesModule } from './technologies/technologies.module';
 import { TagMappingsModule } from './tag-mappings/tag-mappings.module';
 import { VideosModule } from './videos/videos.module';
+import { CreativesModule } from './creatives/creatives.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { VideosModule } from './videos/videos.module';
     TechnologiesModule,
     TagMappingsModule,
     VideosModule,
+    CreativesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
