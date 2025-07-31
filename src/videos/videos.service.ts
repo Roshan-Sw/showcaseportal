@@ -7,12 +7,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
 import { Prisma } from '@prisma/client';
-import {
-  S3Client,
-  DeleteObjectCommand,
-  GetObjectCommand,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 function validateEnv() {
   const requiredEnvVars = [
@@ -46,24 +41,13 @@ export class VideosService {
     this.region = region;
     this.s3Client = new S3Client({
       region,
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
-      },
+      credentials: { accessKeyId, secretAccessKey },
     });
   }
 
-  private async getPresignedUrlFromKey(key: string): Promise<string | null> {
+  private getPublicUrlFromKey(key: string | null): string | null {
     if (!key) return null;
-    try {
-      const command = new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-      });
-      return await getSignedUrl(this.s3Client, command, { expiresIn: 3600 });
-    } catch (e) {
-      return null;
-    }
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 
   async create(dto: CreateVideoDto) {
@@ -115,24 +99,16 @@ export class VideosService {
       this.prisma.video.count({ where }),
     ]);
 
-    const videosWithPresigned = await Promise.all(
-      videos.map(async (video) => {
-        let thumbnail_presigned_url: string | null = null;
-        if (video.thumbnail) {
-          thumbnail_presigned_url = await this.getPresignedUrlFromKey(
-            video.thumbnail,
-          );
-        }
+    const videosWithPublicUrls = videos.map((video) => {
+      const thumbnail_public_url = this.getPublicUrlFromKey(video.thumbnail);
+      const { thumbnail, ...rest } = video;
+      return {
+        ...rest,
+        thumbnail_public_url,
+      };
+    });
 
-        const { thumbnail, ...rest } = video;
-        return {
-          ...rest,
-          thumbnail_presigned_url,
-        };
-      }),
-    );
-
-    return { videos: videosWithPresigned, total, page, limit };
+    return { videos: videosWithPublicUrls, total, page, limit };
   }
 
   async listWithFilters(
@@ -183,24 +159,16 @@ export class VideosService {
       this.prisma.video.count({ where }),
     ]);
 
-    const videosWithPresigned = await Promise.all(
-      videos.map(async (video) => {
-        let thumbnail_presigned_url: string | null = null;
-        if (video.thumbnail) {
-          thumbnail_presigned_url = await this.getPresignedUrlFromKey(
-            video.thumbnail,
-          );
-        }
+    const videosWithPublicUrls = videos.map((video) => {
+      const thumbnail_public_url = this.getPublicUrlFromKey(video.thumbnail);
+      const { thumbnail, ...rest } = video;
+      return {
+        ...rest,
+        thumbnail_public_url,
+      };
+    });
 
-        const { thumbnail, ...rest } = video;
-        return {
-          ...rest,
-          thumbnail_presigned_url,
-        };
-      }),
-    );
-
-    return { videos: videosWithPresigned, total, page, limit };
+    return { videos: videosWithPublicUrls, total, page, limit };
   }
 
   async update(id: number, dto: UpdateVideoDto) {

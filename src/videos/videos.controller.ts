@@ -55,10 +55,11 @@ const s3Client = new S3Client({
   },
 });
 
-function fileName(req, file, cb) {
+function generateFileName(req, file, cb) {
   const uniqueSuffix =
     Date.now() + '_' + file.originalname.replace(/\s+/g, '_');
-  cb(null, `videos/thumbnails/${uniqueSuffix}`);
+  const folder = 'public/videos/thumbnails';
+  cb(null, `${folder}/${uniqueSuffix}`);
 }
 
 @Controller('videos')
@@ -71,10 +72,12 @@ export class VideosController {
       storage: multerS3({
         s3: s3Client,
         bucket,
+        contentType: multerS3.AUTO_CONTENT_TYPE,
+        contentDisposition: 'inline',
         metadata: (req, file, cb) => {
           cb(null, { fieldName: file.fieldname });
         },
-        key: fileName,
+        key: generateFileName,
       }),
       fileFilter: (req, file, cb) => {
         const allowedTypes = [
@@ -166,10 +169,12 @@ export class VideosController {
       storage: multerS3({
         s3: s3Client,
         bucket,
+        contentType: multerS3.AUTO_CONTENT_TYPE,
+        contentDisposition: 'inline',
         metadata: (req, file, cb) => {
           cb(null, { fieldName: file.fieldname });
         },
-        key: fileName,
+        key: generateFileName,
       }),
       fileFilter: (req, file, cb) => {
         const allowedTypes = [

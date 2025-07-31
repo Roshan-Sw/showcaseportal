@@ -8,12 +8,7 @@ import { CreateWebsiteDto } from './dto/create-website.dto';
 import { UpdateWebsiteDto } from './dto/update-website.dto';
 import { UpdateWebsiteTechnologyMappingsDto } from './dto/update-website-technology-mapping.dto';
 import { Prisma } from '@prisma/client';
-import {
-  S3Client,
-  DeleteObjectCommand,
-  GetObjectCommand,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 function validateEnv() {
   const requiredEnvVars = [
@@ -54,17 +49,9 @@ export class WebsitesService {
     });
   }
 
-  private async getPresignedUrlFromKey(key: string): Promise<string | null> {
+  private getPublicUrlFromKey(key: string | null): string | null {
     if (!key) return null;
-    try {
-      const command = new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-      });
-      return await getSignedUrl(this.s3Client, command, { expiresIn: 3600 });
-    } catch (e) {
-      return null;
-    }
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 
   async create(dto: CreateWebsiteDto) {
@@ -121,24 +108,16 @@ export class WebsitesService {
       this.prisma.website.count({ where }),
     ]);
 
-    const websitesWithPresigned = await Promise.all(
-      websites.map(async (website) => {
-        let thumbnail_presigned_url: string | null = null;
-        if (website.thumbnail) {
-          thumbnail_presigned_url = await this.getPresignedUrlFromKey(
-            website.thumbnail,
-          );
-        }
+    const websitesWithPublicUrls = websites.map((website) => {
+      const thumbnail_public_url = this.getPublicUrlFromKey(website.thumbnail);
+      const { thumbnail, ...rest } = website;
+      return {
+        ...rest,
+        thumbnail_public_url,
+      };
+    });
 
-        const { thumbnail, ...rest } = website;
-        return {
-          ...rest,
-          thumbnail_presigned_url,
-        };
-      }),
-    );
-
-    return { websites: websitesWithPresigned, total, page, limit };
+    return { websites: websitesWithPublicUrls, total, page, limit };
   }
 
   async listWithFilters(
@@ -188,24 +167,16 @@ export class WebsitesService {
       this.prisma.website.count({ where }),
     ]);
 
-    const websitesWithPresigned = await Promise.all(
-      websites.map(async (website) => {
-        let thumbnail_presigned_url: string | null = null;
-        if (website.thumbnail) {
-          thumbnail_presigned_url = await this.getPresignedUrlFromKey(
-            website.thumbnail,
-          );
-        }
+    const websitesWithPublicUrls = websites.map((website) => {
+      const thumbnail_public_url = this.getPublicUrlFromKey(website.thumbnail);
+      const { thumbnail, ...rest } = website;
+      return {
+        ...rest,
+        thumbnail_public_url,
+      };
+    });
 
-        const { thumbnail, ...rest } = website;
-        return {
-          ...rest,
-          thumbnail_presigned_url,
-        };
-      }),
-    );
-
-    return { websites: websitesWithPresigned, total, page, limit };
+    return { websites: websitesWithPublicUrls, total, page, limit };
   }
 
   async update(id: number, dto: UpdateWebsiteDto) {
